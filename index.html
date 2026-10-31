@@ -8,7 +8,21 @@ function dateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2
 function dateFromKey(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
 function saturday(d){let a=new Date(d.getFullYear(),d.getMonth(),d.getDate());a.setDate(a.getDate()-(a.getDay()+1)%7);return a}
 function addDays(d,n){let x=new Date(d);x.setDate(x.getDate()+n);return x}
-function cycleIndex(d){const t=Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());return ((Math.floor((t-START)/(7*DAY))%8)+8)%8}
+// Istoriniai meniu: 7 (seniausias), 6, 5, 4, 3, 2, 0, 1 (naujausias).
+// Spalio 17 ir 24 d. savaites paliekame nepakitusias.
+const ROTATION=[7,6,5,4,3,2,0,1];
+const ROTATION_START=Date.UTC(2026,9,31);
+function cycleIndex(d){
+ const t=Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());
+ if(t<ROTATION_START)return ((Math.floor((t-START)/(7*DAY))%8)+8)%8;
+ const n=Math.floor((t-ROTATION_START)/(7*DAY));
+ return ROTATION[((n%8)+8)%8];
+}
+function cycleNumber(d){
+ const t=Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());
+ if(t<ROTATION_START)return cycleIndex(d)+1;
+ return (Math.floor((t-ROTATION_START)/(7*DAY))%8)+1;
+}
 function slot(type,d){return cycleIndex(d)+'-'+type+'-'+((d.getDay()+1)%7)}
 let old;try{old=JSON.parse(localStorage.getItem('familyMenu'))}catch(e){}
 const clone=x=>JSON.parse(JSON.stringify(x));
@@ -23,7 +37,7 @@ let week=0,active=null;
 function day(n){return addDays(saturday(new Date()),week*7+n)}
 function planned(type,d){const k=slot(type,d);return Object.prototype.hasOwnProperty.call(state.templateChanges,k)?state.templateChanges[k]:TEMPLATE[cycleIndex(d)][(d.getDay()+1)%7][{b:0,l:1,d:2}[type]]}
 function meal(type,d){const k=dateKey(d)+type;return Object.prototype.hasOwnProperty.call(state.changes,k)?state.changes[k]:planned(type,d)}
-function render(){const first=day(0),last=day(6);document.getElementById('period').textContent=first.toLocaleDateString('lt-LT',{month:'short',day:'numeric'})+'–'+last.toLocaleDateString('lt-LT',{month:'short',day:'numeric'})+' · '+(cycleIndex(first)+1)+'/8';let root=document.getElementById('days');root.replaceChildren();for(let i=0;i<7;i++){const d=day(i),box=document.createElement('div');box.className='card';const title=document.createElement('h3');title.textContent=d.toLocaleDateString('lt-LT',{weekday:'long',month:'short',day:'numeric'});box.append(title);for(const [type,label] of [['b','Pusryčiai'],['l','Pietūs'],['d','Vakarienė']]){const row=document.createElement('div');row.className='meal';const text=document.createElement('span');const lbl=document.createElement('small');lbl.className='muted';lbl.textContent=label;const value=document.createElement('div');value.textContent=meal(type,d)||'—';text.append(lbl,value);const s=slot(type,d);if(SUGGESTED.has(s)&&!Object.prototype.hasOwnProperty.call(state.templateChanges,s)&&!Object.prototype.hasOwnProperty.call(state.changes,dateKey(d)+type)){const flag=document.createElement('div');flag.className='suggestion';flag.textContent='✳ Siūlytas užpildymas';text.append(flag)}if(UNCONFIRMED.has(s)&&!Object.prototype.hasOwnProperty.call(state.changes,dateKey(d)+type)){const flag=document.createElement('div');flag.className='dateflag';flag.textContent='Istorijoje nebuvo pažymėta kaip suvalgyta';text.append(flag)}const btn=document.createElement('button');btn.textContent='Keisti';btn.onclick=()=>openChoices(type,d);row.append(text,btn);box.append(row)}root.append(box)}}
+function render(){const first=day(0),last=day(6);document.getElementById('period').textContent=first.toLocaleDateString('lt-LT',{month:'short',day:'numeric'})+'–'+last.toLocaleDateString('lt-LT',{month:'short',day:'numeric'})+' · '+cycleNumber(first)+'/8';let root=document.getElementById('days');root.replaceChildren();for(let i=0;i<7;i++){const d=day(i),box=document.createElement('div');box.className='card';const title=document.createElement('h3');title.textContent=d.toLocaleDateString('lt-LT',{weekday:'long',month:'short',day:'numeric'});box.append(title);for(const [type,label] of [['b','Pusryčiai'],['l','Pietūs'],['d','Vakarienė']]){const row=document.createElement('div');row.className='meal';const text=document.createElement('span');const lbl=document.createElement('small');lbl.className='muted';lbl.textContent=label;const value=document.createElement('div');value.textContent=meal(type,d)||'—';text.append(lbl,value);const s=slot(type,d);if(SUGGESTED.has(s)&&!Object.prototype.hasOwnProperty.call(state.templateChanges,s)&&!Object.prototype.hasOwnProperty.call(state.changes,dateKey(d)+type)){const flag=document.createElement('div');flag.className='suggestion';flag.textContent='✳ Siūlytas užpildymas';text.append(flag)}if(UNCONFIRMED.has(s)&&!Object.prototype.hasOwnProperty.call(state.changes,dateKey(d)+type)){const flag=document.createElement('div');flag.className='dateflag';flag.textContent='Istorijoje nebuvo pažymėta kaip suvalgyta';text.append(flag)}const btn=document.createElement('button');btn.textContent='Keisti';btn.onclick=()=>openChoices(type,d);row.append(text,btn);box.append(row)}root.append(box)}}
 function openChoices(type,d){
  active={type,d};
  const labels={b:'pusryčius',l:'pietus',d:'vakarienę'};
